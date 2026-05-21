@@ -3,32 +3,60 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Coming Soon | Tennis Stringing & Racket Services</title>
-    <link rel="stylesheet" href="css/style.css" />
+    <title> Tennis Stringing & Racket Services</title>
+    <link rel="icon" type="image/png" href="assets/images/tennis-ball-large.png" />
+    <link rel="stylesheet" href="css/bundle.css" />
     <link rel="stylesheet" href="js/bundle.css" />
   </head>
   <body>
-    <main class="container">
-      <div class="atropos">
-        <div class="atropos-scale">
-          <div class="atropos-rotate">
-            <div class="atropos-inner">
-              <div class="card">
-                <h1 class="animate-in">Coming Soon</h1>
-                <p class="tagline animate-in">Tennis Stringing & Racket Customization Services</p>
-                <p class="description animate-in">
-                  RVA Local Recreational Stringing and Customization services.
-                </p>
-                <div class="contact animate-in">
-                  <p>Questions? Reach out:</p>
-                  <a href="mailto:contact@example.com" class="magnetic">contact@example.com</a>
-                </div>
-              </div>
-            </div>
+    <!-- Splash Screen -->
+    <div class="splash">
+      <div class="splash__content">
+        <img class="splash__animation" src="assets/images/bike-animation-side.gif" alt="Loading animation" />
+        <p class="splash__loading-text">loading<span class="splash__dots"></span></p>
+      </div>
+    </div>
+
+    <!-- Contact Section -->
+    <div class="main-container flex flex-col">
+      <section class="contact-header">
+        <div class="panel-pixel pixel-borders pixel-borders--2 contact-header__content">
+          <h2 class="contact-header__title">rva racket services</h2>
+          <p class="contact-header__info">vinay soni</p>
+          <p class="contact-header__info">817 798 3062</p>
+        </div>
+      </section>
+
+      <!-- Services Section -->
+      <section class="services">
+        <h2 class="services-title">Services</h2>
+        <div class="flex flex-col md:flex-row gap-xl">
+          <!-- Service 1: String Tension -->
+          <div class="service-card panel-pixel pixel-borders pixel-borders--2 flex-1" data-animation="string">
+            <h3 class="service-heading">stringing</h3>
+            <p class="service-description">variable rate cost</p>
+            <p class="service-description"> <span class="dollar-sign">$</span>10 OR ½ string msrp </p>
+            <p class="service-rates"> ex. <span class="dollar-sign">$</span>12 set → <span class="dollar-sign">$</span>22 strung</p>
+            <p class="service-rates"> ex. <span class="dollar-sign">$</span>26 set → <span class="dollar-sign">$</span>39 strung</p>
+          </div>
+
+          <!-- Service 3: Weight Customization -->
+          <div class="service-card panel-pixel pixel-borders pixel-borders--2 flex-1" data-animation="weights">
+            <h3 class="service-heading">customization + matching</h3>
+            <p class="service-description">add lead, new grips, match multiple sticks</p>
+            <p class="service-rates"> material cost + <span class="dollar-sign">$</span>5/ stick (for matching)</p>
+          </div>
+
+          <!-- Service 2: Racquet Testing -->
+          <div class="service-card panel-pixel pixel-borders pixel-borders--2 flex-1" data-animation="racquet">
+            <h3 class="service-heading">spec-ing</h3>
+              <p class="service-description">get your sticks' actual specs</p>
+              <p class="service-rates"> free with stringing</p>
           </div>
         </div>
-      </div>
-    </main>
+      </section>
+    </div>
+
     <script src="js/bundle.js" defer></script>
   </body>
 </html>
