@@ -1,26 +1,15 @@
 ---
-
----
 import '../styles/global.css';
+import { fetchPlayers, fetchStringing, fetchInventory } from '../lib/api';
 
 let players = [];
 let stringing = [];
 let inventory = [];
 
 try {
-  const API_URL = 'http://localhost:8787';
-  const playersRes = await fetch(`${API_URL}/api/players`);
-  if (playersRes.ok) {
-    players = await playersRes.json();
-  }
-  const stringingRes = await fetch(`${API_URL}/api/stringing`);
-  if (stringingRes.ok) {
-    stringing = await stringingRes.json();
-  }
-  const inventoryRes = await fetch(`${API_URL}/api/inventory`);
-  if (inventoryRes.ok) {
-    inventory = await inventoryRes.json();
-  }
+  players = await fetchPlayers();
+  stringing = await fetchStringing();
+  inventory = await fetchInventory();
 } catch (e) {
   console.error('Failed to fetch data:', e);
 }
