@@ -35,9 +35,73 @@ import '../styles/global.css';
 				<div class="px-4 py-6 sm:px-0">
 					<div class="flex justify-between items-center mb-6">
 						<h2 class="text-2xl font-bold text-gray-900">Inventory</h2>
-						<button class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+						<button id="add-item-btn" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
 							Add Item
 						</button>
+					</div>
+
+					<!-- Add Item Modal -->
+					<div id="add-item-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+						<div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+							<div class="mt-3">
+								<div class="flex justify-between items-center mb-4">
+									<h3 class="text-lg font-medium text-gray-900">Add Inventory Item</h3>
+									<button id="close-modal-btn" class="text-gray-400 hover:text-gray-500">
+										<span class="sr-only">Close</span>
+										<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+										</svg>
+									</button>
+								</div>
+								<form id="add-item-form" class="space-y-4">
+									<div>
+										<label for="name" class="block text-sm font-medium text-gray-700">Name</label>
+										<input type="text" name="name" id="name" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+									</div>
+									<div>
+										<label for="brand" class="block text-sm font-medium text-gray-700">Brand</label>
+										<input type="text" name="brand" id="brand" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+									</div>
+									<div>
+										<label for="category" class="block text-sm font-medium text-gray-700">Category</label>
+										<select name="category" id="category" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+											<option value="string">String</option>
+											<option value="grip">Grip</option>
+											<option value="accessory">Accessory</option>
+											<option value="other">Other</option>
+										</select>
+									</div>
+									<div>
+										<label for="price" class="block text-sm font-medium text-gray-700">Price</label>
+										<input type="number" name="price" id="price" step="0.01" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+									</div>
+									<div>
+										<label for="quantity" class="block text-sm font-medium text-gray-700">Quantity</label>
+										<input type="number" name="quantity" id="quantity" required min="0" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+									</div>
+									<div>
+										<label for="status" class="block text-sm font-medium text-gray-700">Status</label>
+										<select name="status" id="status" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+											<option value="in_stock">In Stock</option>
+											<option value="low_stock">Low Stock</option>
+											<option value="out_of_stock">Out of Stock</option>
+										</select>
+									</div>
+									<div>
+										<label for="notes" class="block text-sm font-medium text-gray-700">Notes</label>
+										<textarea name="notes" id="notes" rows="2" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
+									</div>
+									<div class="flex justify-end space-x-3 pt-4">
+										<button type="button" id="cancel-btn" class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+											Cancel
+										</button>
+										<button type="submit" class="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+											Add Item
+										</button>
+									</div>
+								</form>
+							</div>
+						</div>
 					</div>
 
 					<div class="bg-white shadow rounded-lg">
@@ -69,7 +133,7 @@ import '../styles/global.css';
 		</div>
 
 		<script>
-			const API_URL = import.meta.env.PUBLIC_API_URL || 'https://tennis-admin-api.vnyson.workers.dev';
+			const API_URL = 'https://tennis-admin-api.vnyson.workers.dev';
 			
 			async function loadInventory() {
 				try {
@@ -87,20 +151,23 @@ import '../styles/global.css';
 							</tr>
 						`;
 					} else {
-						tbody.innerHTML = inventory.map(item => `
+						tbody.innerHTML = inventory.map(item => {
+							const quantityClass = item.quantity <= 5 ? 'text-red-600 font-medium' : 'text-gray-500';
+							return `
 							<tr>
 								<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item.name}</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.brand || '-'}</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.category || '-'}</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.price ? `$${item.price}` : '-'}</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.quantity}</td>
+								<td class="px-6 py-4 whitespace-nowrap text-sm ${quantityClass}">${item.quantity}</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${item.status}</td>
 								<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
 									<button class="text-indigo-600 hover:text-indigo-900 mr-3">Edit</button>
 									<button class="text-red-600 hover:text-red-900">Delete</button>
 								</td>
 							</tr>
-						`).join('');
+						`;
+						}).join('');
 					}
 				} catch (error) {
 					console.error('Failed to load inventory:', error);
@@ -114,6 +181,65 @@ import '../styles/global.css';
 					`;
 				}
 			}
+
+			// Modal functionality
+			const modal = document.getElementById('add-item-modal');
+			const addItemBtn = document.getElementById('add-item-btn');
+			const closeModalBtn = document.getElementById('close-modal-btn');
+			const cancelBtn = document.getElementById('cancel-btn');
+			const addItemForm = document.getElementById('add-item-form');
+
+			function openModal() {
+				modal.classList.remove('hidden');
+			}
+
+			function closeModal() {
+				modal.classList.add('hidden');
+				addItemForm.reset();
+			}
+
+			addItemBtn.addEventListener('click', openModal);
+			closeModalBtn.addEventListener('click', closeModal);
+			cancelBtn.addEventListener('click', closeModal);
+
+			// Close modal when clicking outside
+			modal.addEventListener('click', (e) => {
+				if (e.target === modal) {
+					closeModal();
+				}
+			});
+
+			// Form submission
+			addItemForm.addEventListener('submit', async (e) => {
+				e.preventDefault();
+				
+				const formData = new FormData(addItemForm);
+				const data = {
+					name: formData.get('name'),
+					brand: formData.get('brand') || null,
+					category: formData.get('category'),
+					price: formData.get('price') ? parseFloat(formData.get('price')) : null,
+					quantity: parseInt(formData.get('quantity')),
+					status: formData.get('status'),
+					notes: formData.get('notes') || null,
+				};
+
+				try {
+					const response = await fetch(`${API_URL}/api/inventory`, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify(data),
+					});
+
+					if (!response.ok) throw new Error('Failed to add inventory item');
+					
+					closeModal();
+					loadInventory();
+				} catch (error) {
+					console.error('Error adding inventory item:', error);
+					alert('Failed to add inventory item. Please try again.');
+				}
+			});
 
 			// Load inventory when page loads
 			loadInventory();
