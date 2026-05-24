@@ -173,13 +173,16 @@ export async function handleStringing(
 
   if (request.method === 'POST') {
     const body = await request.json();
+    const jobId = body.id || crypto.randomUUID();
+
+    // Insert stringing job
     const stmt = env.DB.prepare(`
       INSERT INTO stringing (id, player_id, racquet, string_mains, string_crosses, gauge_mains, gauge_crosses, tension_mains, tension_crosses, tension_unit, tension_unit_crosses, prestretch, prestretch_crosses, strung_at, notes, status, priority, created_at, player_own_string, labour_cost, material_cost, charge_total, string_tier, service_label, regrip, logo_color, pickup_time, picked_up_at, stringer_name, knots, player_name)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     await stmt
       .bind(
-        body.id || crypto.randomUUID(),
+        jobId,
         body.player_id || null,
         body.racquet || null,
         body.string_mains || null,
@@ -194,8 +197,8 @@ export async function handleStringing(
         body.prestretch_crosses || null,
         body.strung_at || null,
         body.notes || null,
-        body.status || 'open',
-        body.priority || 'regular',
+        body.status || 'in_queue',
+        body.priority || 'normal',
         body.created_at || new Date().toISOString(),
         body.player_own_string || 0,
         body.labour_cost || null,
@@ -212,6 +215,84 @@ export async function handleStringing(
         body.player_name || null,
       )
       .run();
+
+    // Consume inventory if strings are provided and player doesn't own strings
+    if (body.string_mains && !body.player_own_string) {
+      try {
+        // Find inventory item by string name
+        const inventoryItem = await env.DB.prepare(
+          'SELECT * FROM inventory WHERE name = ? AND category = ?',
+        )
+          .bind(body.string_mains, 'string')
+          .first();
+
+        if (inventoryItem && inventoryItem.quantity > 0) {
+          // Decrement inventory quantity
+          await env.DB.prepare(
+            'UPDATE inventory SET quantity = quantity - 1, updated_at = ? WHERE id = ?',
+          )
+            .bind(new Date().toISOString(), inventoryItem.id)
+            .run();
+
+          // Record inventory consumption
+          await env.DB.prepare(
+            `
+            INSERT INTO inventory_consumption (id, inventory_id, stringing_job_id, quantity_consumed, consumed_at, notes)
+            VALUES (?, ?, ?, ?, ?, ?)
+          `,
+          )
+            .bind(
+              crypto.randomUUID(),
+              inventoryItem.id,
+              jobId,
+              1,
+              new Date().toISOString(),
+              `Stringing job for ${body.player_name || 'player'}`,
+            )
+            .run();
+        }
+      } catch (error) {
+        console.error('Error consuming inventory:', error);
+        // Continue even if inventory consumption fails
+      }
+    }
+
+    if (body.string_crosses && !body.player_own_string) {
+      try {
+        const inventoryItem = await env.DB.prepare(
+          'SELECT * FROM inventory WHERE name = ? AND category = ?',
+        )
+          .bind(body.string_crosses, 'string')
+          .first();
+
+        if (inventoryItem && inventoryItem.quantity > 0) {
+          await env.DB.prepare(
+            'UPDATE inventory SET quantity = quantity - 1, updated_at = ? WHERE id = ?',
+          )
+            .bind(new Date().toISOString(), inventoryItem.id)
+            .run();
+
+          await env.DB.prepare(
+            `
+            INSERT INTO inventory_consumption (id, inventory_id, stringing_job_id, quantity_consumed, consumed_at, notes)
+            VALUES (?, ?, ?, ?, ?, ?)
+          `,
+          )
+            .bind(
+              crypto.randomUUID(),
+              inventoryItem.id,
+              jobId,
+              1,
+              new Date().toISOString(),
+              `Stringing job for ${body.player_name || 'player'}`,
+            )
+            .run();
+        }
+      } catch (error) {
+        console.error('Error consuming inventory:', error);
+      }
+    }
+
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -232,6 +313,31 @@ export async function handleStringing(
   }
 
   if (request.method === 'DELETE') {
+    // Rollback inventory consumption for this job
+    const consumptions = await env.DB.prepare(
+      'SELECT * FROM inventory_consumption WHERE stringing_job_id = ?',
+    )
+      .bind(id)
+      .all();
+
+    for (const consumption of consumptions.results) {
+      try {
+        await env.DB.prepare(
+          'UPDATE inventory SET quantity = quantity + ?, updated_at = ? WHERE id = ?',
+        )
+          .bind(consumption.quantity_consumed, new Date().toISOString(), consumption.inventory_id)
+          .run();
+      } catch (error) {
+        console.error('Error rolling back inventory:', error);
+      }
+    }
+
+    // Delete inventory consumption records
+    await env.DB.prepare('DELETE FROM inventory_consumption WHERE stringing_job_id = ?')
+      .bind(id)
+      .run();
+
+    // Delete the stringing job
     await env.DB.prepare('DELETE FROM stringing WHERE id = ?').bind(id).run();
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

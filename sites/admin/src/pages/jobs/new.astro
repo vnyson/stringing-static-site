@@ -2,6 +2,177 @@
 import '../../styles/global.css';
 ---
 
+<script>
+  const API_URL = 'https://tennis-admin-api.vnyson.workers.dev';
+
+  let players = [];
+  let inventory = [];
+  let selectedPlayer = null;
+
+  async function loadPlayers() {
+    try {
+      const response = await fetch(`${API_URL}/api/players`);
+      if (!response.ok) throw new Error('Failed to fetch players');
+      players = await response.json();
+      populatePlayerDropdown();
+    } catch (error) {
+      console.error('Error loading players:', error);
+    }
+  }
+
+  async function loadInventory() {
+    try {
+      const response = await fetch(`${API_URL}/api/inventory`);
+      if (!response.ok) throw new Error('Failed to fetch inventory');
+      inventory = await response.json();
+    } catch (error) {
+      console.error('Error loading inventory:', error);
+    }
+  }
+
+  function populatePlayerDropdown() {
+    const select = document.getElementById('player_select');
+    if (!select) return;
+
+    select.innerHTML = '<option value="">Select a player...</option>';
+    players.forEach(player => {
+      const option = document.createElement('option');
+      option.value = player.id;
+      option.textContent = player.name;
+      select.appendChild(option);
+    });
+  }
+
+  function handlePlayerChange(event) {
+    const playerId = event.target.value;
+    selectedPlayer = players.find(p => p.id === playerId);
+    
+    if (selectedPlayer) {
+      document.getElementById('player_name').value = selectedPlayer.name || '';
+      document.getElementById('phone').value = selectedPlayer.phone || '';
+      document.getElementById('string_mains').value = selectedPlayer.string_pref || '';
+      document.getElementById('tension_mains').value = selectedPlayer.tension || '';
+      
+      // Auto-fill racquet if player has one
+      if (selectedPlayer.racquet) {
+        document.getElementById('racquet').value = selectedPlayer.racquet;
+      }
+    }
+  }
+
+  function checkInventoryAvailability(stringName) {
+    const warningDiv = document.getElementById('inventory-warning');
+    if (!warningDiv || !stringName) {
+      if (warningDiv) warningDiv.innerHTML = '';
+      return;
+    }
+
+    const item = inventory.find(i => i.name === stringName && i.category === 'string');
+    if (item && item.quantity <= 5) {
+      warningDiv.innerHTML = `
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <div class="ml-3">
+              <p class="text-sm text-yellow-700">
+                Low stock warning: Only ${item.quantity} sets of ${item.name} remaining.
+              </p>
+            </div>
+          </div>
+        </div>
+      `;
+    } else if (item && item.quantity === 0) {
+      warningDiv.innerHTML = `
+        <div class="bg-red-50 border-l-4 border-red-400 p-4">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <div class="ml-3">
+              <p class="text-sm text-red-700">
+                Out of stock: ${item.name} is not available.
+              </p>
+            </div>
+          </div>
+        </div>
+      `;
+    } else {
+      warningDiv.innerHTML = '';
+    }
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    const data = {
+      player_id: selectedPlayer?.id || null,
+      player_name: formData.get('player_name'),
+      phone: formData.get('phone'),
+      racquet: formData.get('racquet'),
+      string_mains: formData.get('string_mains'),
+      string_crosses: formData.get('string_crosses'),
+      tension_mains: formData.get('tension_mains'),
+      tension_crosses: formData.get('tension_crosses'),
+      tension_unit: formData.get('tension_unit'),
+      notes: formData.get('notes'),
+      status: 'in_queue',
+      priority: formData.get('rush') === 'on' ? 'rush' : 'normal',
+    };
+
+    try {
+      const response = await fetch(`${API_URL}/api/stringing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) throw new Error('Failed to create job');
+      
+      window.location.href = '/jobs';
+    } catch (error) {
+      console.error('Error creating job:', error);
+      alert('Failed to create job. Please try again.');
+    }
+  }
+
+  // Load data on page load
+  document.addEventListener('DOMContentLoaded', () => {
+    loadPlayers();
+    loadInventory();
+    
+    const form = document.querySelector('form');
+    if (form) {
+      form.addEventListener('submit', handleSubmit);
+    }
+
+    const playerSelect = document.getElementById('player_select');
+    if (playerSelect) {
+      playerSelect.addEventListener('change', handlePlayerChange);
+    }
+
+    const stringMainsInput = document.getElementById('string_mains');
+    if (stringMainsInput) {
+      stringMainsInput.addEventListener('input', (e) => {
+        checkInventoryAvailability(e.target.value);
+      });
+    }
+
+    const stringCrossesInput = document.getElementById('string_crosses');
+    if (stringCrossesInput) {
+      stringCrossesInput.addEventListener('input', (e) => {
+        checkInventoryAvailability(e.target.value);
+      });
+    }
+  });
+</script>
+
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
@@ -40,8 +211,24 @@ import '../../styles/global.css';
 
 					<div class="bg-white shadow rounded-lg">
 						<div class="px-4 py-5 sm:p-6">
+							<div id="inventory-warning" class="mb-4"></div>
 							<form class="space-y-6">
 								<div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+									<div class="sm:col-span-3">
+										<label for="player_select" class="block text-sm font-medium text-gray-700">Select Player</label>
+										<select name="player_select" id="player_select" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+											<option value="">Select a player...</option>
+										</select>
+									</div>
+
+									<div class="sm:col-span-3">
+										<label for="rush" class="block text-sm font-medium text-gray-700">Rush Job</label>
+										<div class="mt-2">
+											<input type="checkbox" name="rush" id="rush" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" />
+											<span class="ml-2 text-sm text-gray-600">Mark as rush job</span>
+										</div>
+									</div>
+
 									<div class="sm:col-span-3">
 										<label for="player_name" class="block text-sm font-medium text-gray-700">Player Name</label>
 										<input type="text" name="player_name" id="player_name" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
