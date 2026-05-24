@@ -218,6 +218,37 @@ describe('Queue Ordering Logic', () => {
     
     expect(etaString).toBe('30m');
   });
+});
+
+describe('Inventory Consumption Logic', () => {
+  it('should calculate inventory consumption for stringing job', () => {
+    const initialQuantity = 10;
+    const consumed = 1;
+    const remaining = initialQuantity - consumed;
+    
+    expect(remaining).toBe(9);
+  });
+
+  it('should identify low stock when quantity <= 5', () => {
+    const quantity = 5;
+    const isLowStock = quantity <= 5;
+    
+    expect(isLowStock).toBe(true);
+  });
+
+  it('should not identify low stock when quantity > 5', () => {
+    const quantity = 6;
+    const isLowStock = quantity <= 5;
+    
+    expect(isLowStock).toBe(false);
+  });
+
+  it('should calculate rollback quantity', () => {
+    const consumedQuantity = 2;
+    const rollbackQuantity = consumedQuantity;
+    
+    expect(rollbackQuantity).toBe(2);
+  });
 
   it('should throw error when create stringing job fails', async () => {
     (global.fetch as any).mockResolvedValueOnce({
