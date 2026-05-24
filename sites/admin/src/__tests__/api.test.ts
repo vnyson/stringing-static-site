@@ -113,6 +113,48 @@ describe('API Client - Stringing', () => {
     );
   });
 
+  it('should create a stringing job with in_queue status by default', async () => {
+    const mockResponse = { success: true, id: '1' };
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse,
+    });
+
+    const result = await createStringingJob({ player_name: 'Jane Doe', racquet: 'Wilson Pro Staff' });
+    expect(result).toEqual(mockResponse);
+    const callArgs = (global.fetch as any).mock.calls[0];
+    const body = JSON.parse(callArgs[1].body);
+    expect(body.status).toBe('in_queue');
+  });
+
+  it('should create a stringing job with rush priority', async () => {
+    const mockResponse = { success: true, id: '1' };
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse,
+    });
+
+    const result = await createStringingJob({ player_name: 'Jane Doe', racquet: 'Wilson Pro Staff', priority: 'rush' });
+    expect(result).toEqual(mockResponse);
+    const callArgs = (global.fetch as any).mock.calls[0];
+    const body = JSON.parse(callArgs[1].body);
+    expect(body.priority).toBe('rush');
+  });
+
+  it('should create a stringing job with player_id', async () => {
+    const mockResponse = { success: true, id: '1' };
+    (global.fetch as any).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse,
+    });
+
+    const result = await createStringingJob({ player_id: 'player-123', player_name: 'Jane Doe', racquet: 'Wilson Pro Staff' });
+    expect(result).toEqual(mockResponse);
+    const callArgs = (global.fetch as any).mock.calls[0];
+    const body = JSON.parse(callArgs[1].body);
+    expect(body.player_id).toBe('player-123');
+  });
+
   it('should throw error when create stringing job fails', async () => {
     (global.fetch as any).mockResolvedValueOnce({
       ok: false,

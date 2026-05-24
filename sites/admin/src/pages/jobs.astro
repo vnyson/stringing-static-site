@@ -87,20 +87,35 @@ import '../styles/global.css';
 							</tr>
 						`;
 					} else {
-						tbody.innerHTML = jobs.map(job => `
-							<tr>
-								<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${job.player_name || job.player_id}</td>
+						tbody.innerHTML = jobs.map(job => {
+							const isRush = job.priority === 'rush';
+							const statusClass = job.status === 'in_queue' ? 'bg-yellow-100 text-yellow-800' :
+												job.status === 'completed' ? 'bg-green-100 text-green-800' :
+												job.status === 'waiting_for_pickup' ? 'bg-blue-100 text-blue-800' :
+												'bg-gray-100 text-gray-800';
+							
+							return `
+							<tr class="${isRush ? 'bg-red-50' : ''}">
+								<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+									${job.player_name || job.player_id}
+									${isRush ? '<span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">RUSH</span>' : ''}
+								</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${job.racquet || '-'}</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${job.string_mains || job.string || '-'}</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${job.tension_mains || job.tension || '-'}${job.tension_unit || ''}</td>
-								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${job.status}</td>
+								<td class="px-6 py-4 whitespace-nowrap text-sm">
+									<span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">
+										${job.status || 'open'}
+									</span>
+								</td>
 								<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${new Date(job.created_at).toLocaleDateString()}</td>
 								<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
 									<button class="text-indigo-600 hover:text-indigo-900 mr-3">Edit</button>
 									<button class="text-red-600 hover:text-red-900">Delete</button>
 								</td>
 							</tr>
-						`).join('');
+						`;
+						}).join('');
 					}
 				} catch (error) {
 					console.error('Failed to load jobs:', error);
