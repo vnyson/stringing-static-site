@@ -64,14 +64,22 @@ function generateAccessToken(): string {
 }
 
 // OAuth handler - redirect to Google
-async function handleGoogleAuth(request: Request, env: Env, corsHeaders: HeadersInit): Promise<Response> {
+async function handleGoogleAuth(
+  request: Request,
+  env: Env,
+  corsHeaders: HeadersInit,
+): Promise<Response> {
   const redirectUri = `${new URL(request.url).origin}/auth/google/callback`;
   const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=email%20profile`;
   return Response.redirect(authUrl, 302);
 }
 
 // OAuth callback handler
-async function handleGoogleCallback(request: Request, env: Env, corsHeaders: HeadersInit): Promise<Response> {
+async function handleGoogleCallback(
+  request: Request,
+  env: Env,
+  corsHeaders: HeadersInit,
+): Promise<Response> {
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
 
@@ -101,7 +109,10 @@ async function handleGoogleCallback(request: Request, env: Env, corsHeaders: Hea
   const tokens = await tokenResponse.json();
 
   if (tokens.error) {
-    return new Response(JSON.stringify({ error: tokens.error }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: tokens.error }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
   // Get user info
@@ -127,7 +138,11 @@ async function handleGoogleCallback(request: Request, env: Env, corsHeaders: Hea
 }
 
 // Handler for player-by-token endpoint
-async function handlePlayerByToken(request: Request, env: Env, corsHeaders: HeadersInit): Promise<Response> {
+async function handlePlayerByToken(
+  request: Request,
+  env: Env,
+  corsHeaders: HeadersInit,
+): Promise<Response> {
   if (request.method !== 'GET') {
     return new Response('Method Not Allowed', { status: 405, headers: corsHeaders });
   }
@@ -151,12 +166,16 @@ async function handlePlayerByToken(request: Request, env: Env, corsHeaders: Head
   }
 
   // Get player's stringing jobs
-  const jobs = await env.DB.prepare('SELECT * FROM stringing WHERE player_id = ? ORDER BY created_at DESC')
+  const jobs = await env.DB.prepare(
+    'SELECT * FROM stringing WHERE player_id = ? ORDER BY created_at DESC',
+  )
     .bind(playerId)
     .all();
 
   // Get player's rackets
-  const rackets = await env.DB.prepare('SELECT * FROM rackets WHERE player_id = ? ORDER BY created_at DESC')
+  const rackets = await env.DB.prepare(
+    'SELECT * FROM rackets WHERE player_id = ? ORDER BY created_at DESC',
+  )
     .bind(playerId)
     .all();
 
@@ -166,7 +185,11 @@ async function handlePlayerByToken(request: Request, env: Env, corsHeaders: Head
 }
 
 // Handler for regenerate-token endpoint
-async function handleRegenerateToken(request: Request, env: Env, corsHeaders: HeadersInit): Promise<Response> {
+async function handleRegenerateToken(
+  request: Request,
+  env: Env,
+  corsHeaders: HeadersInit,
+): Promise<Response> {
   if (request.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405, headers: corsHeaders });
   }

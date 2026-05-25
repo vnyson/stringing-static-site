@@ -58,12 +58,13 @@ export function initSplash(options = {}) {
   if (config.animationMode === 'bike') {
     const animationImg = splash.querySelector('.splash__animation');
     if (animationImg) {
-      const animations = config.animationPaths.length > 0
-        ? config.animationPaths
-        : [
-            'assets/images/splash-loading/bike-animation-side-large.gif',
-            'assets/images/splash-loading/bike-antimation-front-large.gif',
-          ];
+      const animations =
+        config.animationPaths.length > 0
+          ? config.animationPaths
+          : [
+              'assets/images/splash-loading/bike-animation-side-large.gif',
+              'assets/images/splash-loading/bike-antimation-front-large.gif',
+            ];
       const randomIndex = Math.floor(Math.random() * animations.length);
       animationImg.src = animations[randomIndex];
     }
