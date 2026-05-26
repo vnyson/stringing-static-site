@@ -89,15 +89,17 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Inventory Overlay
-  const inventoryButton = document.querySelector('.inventory-button');
+  const inventoryButtons = document.querySelectorAll('.inventory-button');
   const inventoryOverlay = document.getElementById('inventory-overlay');
   const inventoryCloseButton = document.querySelector('.inventory-overlay__close');
   const inventoryGrid = document.getElementById('inventory-grid');
 
-  if (inventoryButton && inventoryOverlay) {
-    inventoryButton.addEventListener('click', () => {
-      inventoryOverlay.classList.remove('hidden');
-      fetchInventory();
+  if (inventoryButtons.length > 0 && inventoryOverlay) {
+    inventoryButtons.forEach((inventoryButton) => {
+      inventoryButton.addEventListener('click', () => {
+        inventoryOverlay.classList.remove('hidden');
+        fetchInventory();
+      });
     });
   }
 

@@ -133,7 +133,7 @@ body {
   }
 
   .contact-header__content {
-    padding: var(--space-lg);
+    padding: var(--space-lg) var(--space-md);
   }
 
   .queue-indicator.mobile {
