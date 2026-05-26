@@ -40,25 +40,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (count === 0) {
       imageName = 'Pokemon Hospital-0.png';
-      text = 'No wait';
+      text = '1-2 days';
     } else if (count === 1) {
       imageName = 'Pokemon Hospital-1.png';
-      text = '1 day';
+      text = '2-3 days';
     } else if (count === 2) {
       imageName = 'Pokemon Hospital-2.png';
-      text = '2 days';
+      text = '3-4 days';
     } else if (count === 3) {
       imageName = 'Pokemon Hospital-3.png';
-      text = '3 days';
+      text = '4-5 days';
     } else if (count === 4) {
       imageName = 'Pokemon Hospital-4.png';
-      text = '4 days';
+      text = '5-6 days';
     } else if (count === 5) {
       imageName = 'Pokemon Hospital-5.png';
-      text = '5 days';
+      text = '6-7 days';
     } else if (count === 6) {
       imageName = 'Pokemon Hospital-6.png';
-      text = '6 days';
+      text = '7-8 days';
     } else {
       imageName = 'Pokemon Hospital-FULL.png';
       text = '1-2 weeks';
