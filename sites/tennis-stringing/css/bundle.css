@@ -778,7 +778,7 @@ body {
   color: var(--color-gray-800);
   font-weight: var(--font-weight-bold);
   margin: 0;
-  text-transform: uppercase;
+  text-transform: uppercase !important;
 }
 .queue-image {
   width: 48px;
@@ -794,6 +794,7 @@ body {
   font-size: var(--font-size-xs);
   color: var(--color-gray-600);
   font-weight: var(--font-weight-semibold);
+  text-transform: none !important;
 }
 .stringing-care-wrapper {
   display: flex;
