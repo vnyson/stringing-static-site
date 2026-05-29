@@ -91,31 +91,655 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Inventory Overlay
-  const inventoryButtons = document.querySelectorAll('.inventory-button');
+  // Profile Overlay
+  const profileButtons = document.querySelectorAll('.profile-button, .profile-button-mobile');
+  const profileOverlay = document.getElementById('profile-overlay');
+  const profileCloseButton = document.querySelector('.profile-overlay__close');
   const inventoryOverlay = document.getElementById('inventory-overlay');
+
+  function closeAllOverlays() {
+    profileOverlay?.classList.add('hidden');
+    inventoryOverlay?.classList.add('hidden');
+  }
+
+  function openProfileOverlay() {
+    closeAllOverlays();
+    profileOverlay?.classList.remove('hidden');
+  }
+
+  function openInventoryOverlay() {
+    closeAllOverlays();
+    inventoryOverlay?.classList.remove('hidden');
+  }
+
+  const profileLoading = document.getElementById('profile-loading');
+  const profileErrorAlert = document.getElementById('profile-error-alert');
+  const profileSuccessAlert = document.getElementById('profile-success-alert');
+
+  const profileVerifyPanel = document.getElementById('profile-verify-panel');
+  const profileVerifyForm = document.getElementById('profile-verify-form');
+  const verifyNameInput = document.getElementById('verify-name');
+  const verifyPhoneLast4Container = document.getElementById('verify-phone-last4-container');
+  const verifyPhoneLast4Input = document.getElementById('verify-phone-last4');
+  const verifyPhoneFullContainer = document.getElementById('verify-phone-full-container');
+  const verifyPhoneFullInput = document.getElementById('verify-phone-full');
+  const profileClearTokenBtn = document.getElementById('profile-clear-token-btn');
+
+  const profileViewPanel = document.getElementById('profile-view-panel');
+  const profileEditForm = document.getElementById('profile-edit-form');
+
+  // Fields
+  const profileNameInput = document.getElementById('profile-name');
+  const profileEmailInput = document.getElementById('profile-email');
+  const profilePhoneInput = document.getElementById('profile-phone');
+  const profileStringPrefInput = document.getElementById('profile-string-pref');
+  const profileTensionInput = document.getElementById('profile-tension');
+  const profileGripInput = document.getElementById('profile-grip');
+  const profileRacquetInput = document.getElementById('profile-racquet');
+  const profileNotesInput = document.getElementById('profile-notes');
+
+  // Lists & inventory
+  const profileJobsList = document.getElementById('profile-jobs-list');
+  const profileRacketSlots = document.getElementById('profile-racket-slots');
+  const profileRacketDetail = document.getElementById('profile-racket-detail');
+  const profileRacketInventory = document.getElementById('profile-racket-inventory');
+  const profileJobStatus = document.getElementById('profile-job-status');
+  const profileImage = document.getElementById('profile-image');
+
+  // Tabs
+  const profileTabButtons = document.querySelectorAll('.profile-tab-btn');
+  const profileTabContents = document.querySelectorAll('.profile-tab-content');
+
+  let currentPlayerData = null;
+  let currentPlayerRackets = [];
+  let isCollisionActive = false;
+  let alertDismissTimeout = null;
+
+  const ALERT_DISMISS_MS = 4000;
+  const DEFAULT_RACKET_IMAGE = 'assets/images/rackets/Wilson Pro Staff.png';
+  const GENERIC_PROFILE_IMAGE = 'assets/images/profile/generic.png';
+  const QUEUED_JOB_STATUSES = new Set(['queued', 'in_queue']);
+  const READY_JOB_STATUS = 'ready_for_pickup';
+  const RACKET_INVENTORY_SLOTS = [
+    { left: '10%', bottom: '6%', width: '17%' },
+    { left: '28%', bottom: '6%', width: '17%' },
+    { left: '46%', bottom: '6%', width: '17%' },
+    { left: '64%', bottom: '6%', width: '17%' },
+    { left: '82%', bottom: '6%', width: '17%' },
+  ];
+
+  const RACKET_IMAGE_MAP = {
+    'babolat pure aero': 'assets/images/rackets/Babolat Pure Aero.png',
+    'babolat pure drive': 'assets/images/rackets/Babolat Pure Drive.png',
+    'babolat pure strike': 'assets/images/rackets/Babolat Pure Strike.png',
+    'head gravity': 'assets/images/rackets/Head Gravity.png',
+    'head radical': 'assets/images/rackets/Head Radical.png',
+    'head speed': 'assets/images/rackets/Head Speed.png',
+    'wilson blade': 'assets/images/rackets/Wilson Blade.png',
+    'wilson pro staff': 'assets/images/rackets/Wilson Pro Staff.png',
+    'wilson redline': 'assets/images/rackets/Wilson Redline.png',
+    'yonex ezone': 'assets/images/rackets/Yonex Ezone.png',
+    'yonex vcore': 'assets/images/rackets/Yonex VCORE.png',
+  };
+
+  function getRacketImage(brand, model) {
+    const fullKey = `${brand || ''} ${model || ''}`.trim().toLowerCase();
+    if (!fullKey) return DEFAULT_RACKET_IMAGE;
+
+    if (RACKET_IMAGE_MAP[fullKey]) return RACKET_IMAGE_MAP[fullKey];
+
+    let bestMatch = null;
+    let bestLength = 0;
+    for (const [key, path] of Object.entries(RACKET_IMAGE_MAP)) {
+      if (fullKey.includes(key) || key.includes(fullKey)) {
+        if (key.length > bestLength) {
+          bestLength = key.length;
+          bestMatch = path;
+        }
+      }
+    }
+
+    return bestMatch || DEFAULT_RACKET_IMAGE;
+  }
+
+  function getRacketImageForText(racquetText, playerRackets = []) {
+    const text = (racquetText || '').trim().toLowerCase();
+
+    for (const racket of playerRackets) {
+      const fullName = `${racket.brand || ''} ${racket.model || ''}`.trim().toLowerCase();
+      if (!fullName) continue;
+
+      if (
+        (text && (text.includes(fullName) || fullName.includes(text))) ||
+        (racket.model && text.includes(racket.model.toLowerCase()))
+      ) {
+        return getRacketImage(racket.brand, racket.model);
+      }
+    }
+
+    if (text) {
+      let bestMatch = null;
+      let bestLength = 0;
+      for (const [key, path] of Object.entries(RACKET_IMAGE_MAP)) {
+        if (text.includes(key) || key.includes(text)) {
+          if (key.length > bestLength) {
+            bestLength = key.length;
+            bestMatch = path;
+          }
+        }
+      }
+      if (bestMatch) return bestMatch;
+    }
+
+    if (playerRackets.length > 0) {
+      return getRacketImage(playerRackets[0].brand, playerRackets[0].model);
+    }
+
+    return DEFAULT_RACKET_IMAGE;
+  }
+
+  function formatJobTypeLabel(rawType) {
+    const type = (rawType || '').toLowerCase();
+    if (type === 'stringing' || type === 'string') return 'string';
+    if (type === 'customization') return 'customization';
+    if (type === 'matching') return 'matching';
+    return type || 'string';
+  }
+
+  function buildMergedJobEntries(jobs, history) {
+    const stringingEntries = (jobs || []).map((job) => ({
+      source: 'stringing',
+      created_at: job.created_at,
+      job_type: formatJobTypeLabel(job.job_type),
+      data: job,
+    }));
+
+    const historyEntries = (history || []).map((record) => ({
+      source: 'history',
+      created_at: record.created_at,
+      job_type: formatJobTypeLabel(record.job_type),
+      data: record,
+    }));
+
+    return [...stringingEntries, ...historyEntries].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+  }
+
+  function renderJobTypeLabel(jobType) {
+    const label = formatJobTypeLabel(jobType);
+    return `<span class="job-type-label job-type-label--${label}">${label}</span>`;
+  }
+
+  function renderRacketInventory(rackets) {
+    currentPlayerRackets = rackets || [];
+
+    if (profileRacketDetail) {
+      profileRacketDetail.classList.add('hidden');
+      profileRacketDetail.innerHTML = '';
+    }
+
+    if (!profileRacketSlots) return;
+
+    if (currentPlayerRackets.length === 0) {
+      profileRacketSlots.innerHTML = '';
+      return;
+    }
+
+    profileRacketSlots.innerHTML = currentPlayerRackets
+      .slice(0, RACKET_INVENTORY_SLOTS.length)
+      .map((racket, index) => {
+        const slot = RACKET_INVENTORY_SLOTS[index];
+        const src = getRacketImage(racket.brand, racket.model);
+        const label = `${racket.brand || ''} ${racket.model || ''}`.trim();
+
+        return `
+          <button
+            type="button"
+            class="profile-racket-inventory__slot"
+            data-racket-index="${index}"
+            style="left:${slot.left};bottom:${slot.bottom};width:${slot.width};height:80%;"
+            aria-label="${label || 'Racquet'}"
+          >
+            <img src="${src}" alt="" />
+          </button>
+        `;
+      })
+      .join('');
+  }
+
+  function showRacketDetail(racket, selectedButton) {
+    if (!profileRacketDetail || !racket) return;
+
+    profileRacketSlots?.querySelectorAll('.profile-racket-inventory__slot').forEach((slot) => {
+      slot.classList.toggle('is-selected', slot === selectedButton);
+    });
+
+    profileRacketDetail.innerHTML = `
+      <div><strong>${racket.brand || 'Unknown'} ${racket.model || ''}</strong></div>
+      ${racket.year ? `<div><strong>Year:</strong> ${racket.year}</div>` : ''}
+      ${racket.notes ? `<div><strong>Notes:</strong> ${racket.notes}</div>` : ''}
+    `;
+    profileRacketDetail.classList.remove('hidden');
+  }
+
+  function renderRacketImageMarkup(racquetText, playerRackets, altText) {
+    const src = getRacketImageForText(racquetText, playerRackets);
+    const alt = altText || racquetText || 'Racquet';
+    return `<img src="${src}" alt="${alt}" class="racket-item__image" />`;
+  }
+
+  function renderStringingJobEntry(job, playerRackets) {
+    const statusLabel =
+      isJobQueued(job.status) && job.queue_position
+        ? `${job.status} (#${job.queue_position})`
+        : job.status || 'N/A';
+
+    return `
+      <div class="job-item flex items-center gap-md panel-pixel pixel-borders pixel-borders--1" style="padding: var(--space-xs); margin-bottom: var(--space-xs); background: var(--color-gray-100); text-align: left;">
+        ${renderRacketImageMarkup(job.racquet, playerRackets, job.racquet)}
+        <div class="flex flex-col gap-xs">
+          ${renderJobTypeLabel(job.job_type || 'stringing')}
+          <div><strong>Racquet:</strong> ${job.racquet || 'N/A'}</div>
+          <div><strong>String:</strong> ${job.string_mains || job.string || 'N/A'} ${job.string_crosses ? `/ ${job.string_crosses}` : ''}</div>
+          <div><strong>Tension:</strong> ${job.tension_mains || job.tension || 'N/A'}${job.tension_unit || ''} ${job.tension_crosses ? `/ ${job.tension_crosses}${job.tension_unit_crosses || ''}` : ''}</div>
+          <div><strong>Status:</strong> ${statusLabel}</div>
+          <div><strong>Date:</strong> ${new Date(job.created_at).toLocaleDateString()}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderHistoryJobEntry(record, playerRackets) {
+    return `
+      <div class="job-item flex items-center gap-md panel-pixel pixel-borders pixel-borders--1" style="padding: var(--space-xs); margin-bottom: var(--space-xs); background: var(--color-gray-100); text-align: left;">
+        ${renderRacketImageMarkup(record.racquet, playerRackets, record.racquet)}
+        <div class="flex flex-col gap-xs">
+          ${renderJobTypeLabel(record.job_type || 'customization')}
+          <div><strong>Racquet:</strong> ${record.racquet || 'N/A'}</div>
+          <div><strong>Current Wt / Bal:</strong> ${record.current_weight ? `${record.current_weight}g` : 'N/A'} / ${record.current_balance ? `${record.current_balance}cm` : 'N/A'}</div>
+          <div><strong>Target Wt / Bal:</strong> ${record.target_weight ? `${record.target_weight}g` : 'N/A'} / ${record.target_balance ? `${record.target_balance}cm` : 'N/A'}</div>
+          <div><strong>Mass Added:</strong> ${record.mass_added ? `${record.mass_added}g` : 'N/A'} ${record.mass_location ? `@ ${record.mass_location}` : ''}</div>
+          <div><strong>SW Delta / Result:</strong> ${record.sw_delta ? `+${record.sw_delta}` : 'N/A'} / ${record.sw_result ? `${record.sw_result}` : 'N/A'}</div>
+          ${record.notes ? `<div><strong>Notes:</strong> ${record.notes}</div>` : ''}
+          <div><strong>Date:</strong> ${new Date(record.created_at).toLocaleDateString()}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function isJobQueued(status) {
+    return QUEUED_JOB_STATUSES.has((status || '').toLowerCase());
+  }
+
+  function renderProfileJobStatus(jobs) {
+    if (!profileJobStatus) return;
+
+    const readyJobs = (jobs || []).filter((job) => job.status === READY_JOB_STATUS);
+    if (readyJobs.length > 0) {
+      const countLabel = readyJobs.length > 1 ? ` (${readyJobs.length} racquets)` : '';
+      profileJobStatus.textContent = `Ready to pick up${countLabel}`;
+      profileJobStatus.className = 'profile-job-status profile-job-status--ready';
+      profileJobStatus.classList.remove('hidden');
+      return;
+    }
+
+    const queuedJobs = (jobs || []).filter((job) => isJobQueued(job.status));
+    if (queuedJobs.length > 0) {
+      const primaryJob = queuedJobs.reduce((best, job) => {
+        const bestPosition = best.queue_position ?? Number.MAX_SAFE_INTEGER;
+        const jobPosition = job.queue_position ?? Number.MAX_SAFE_INTEGER;
+        return jobPosition < bestPosition ? job : best;
+      });
+      const position = primaryJob.queue_position;
+      const positionLabel = position ? `#${position} in queue` : 'In queue';
+      const countLabel = queuedJobs.length > 1 ? ` · ${queuedJobs.length} jobs` : '';
+      profileJobStatus.textContent = `${positionLabel}${countLabel}`;
+      profileJobStatus.className = 'profile-job-status profile-job-status--queue';
+      profileJobStatus.classList.remove('hidden');
+      return;
+    }
+
+    profileJobStatus.textContent = '';
+    profileJobStatus.className = 'profile-job-status hidden';
+  }
+
+  function showPanel(panelId) {
+    [profileLoading, profileVerifyPanel, profileViewPanel].forEach((panel) => {
+      if (panel) panel.classList.add('hidden');
+    });
+    const target = document.getElementById(panelId);
+    if (target) target.classList.remove('hidden');
+  }
+
+  function showAlert(type, message, autoDismissMs = ALERT_DISMISS_MS) {
+    if (alertDismissTimeout) {
+      clearTimeout(alertDismissTimeout);
+      alertDismissTimeout = null;
+    }
+
+    if (profileErrorAlert) profileErrorAlert.classList.add('hidden');
+    if (profileSuccessAlert) profileSuccessAlert.classList.add('hidden');
+
+    const alert = type === 'error' ? profileErrorAlert : profileSuccessAlert;
+    if (alert) {
+      alert.textContent = message;
+      alert.classList.remove('hidden');
+    }
+
+    if (autoDismissMs > 0) {
+      alertDismissTimeout = setTimeout(clearAlerts, autoDismissMs);
+    }
+  }
+
+  function clearAlerts() {
+    if (alertDismissTimeout) {
+      clearTimeout(alertDismissTimeout);
+      alertDismissTimeout = null;
+    }
+    if (profileErrorAlert) profileErrorAlert.classList.add('hidden');
+    if (profileSuccessAlert) profileSuccessAlert.classList.add('hidden');
+  }
+
+  function setClearTokenButtonVisible(visible) {
+    if (profileClearTokenBtn) {
+      profileClearTokenBtn.classList.toggle('hidden', !visible);
+    }
+  }
+
+  function resetVerificationFormState() {
+    isCollisionActive = false;
+    if (verifyPhoneLast4Container) verifyPhoneLast4Container.classList.remove('hidden');
+    if (verifyPhoneFullContainer) verifyPhoneFullContainer.classList.add('hidden');
+    if (verifyPhoneLast4Input) {
+      verifyPhoneLast4Input.setAttribute('required', 'true');
+      verifyPhoneLast4Input.value = '';
+    }
+    if (verifyPhoneFullInput) {
+      verifyPhoneFullInput.removeAttribute('required');
+      verifyPhoneFullInput.value = '';
+    }
+    if (verifyNameInput) verifyNameInput.value = '';
+    clearAlerts();
+  }
+
+  async function loadProfileWithToken(token) {
+    showPanel('profile-loading');
+    clearAlerts();
+    try {
+      const response = await fetch(
+        `${API_URL}/api/player-by-token?token=${encodeURIComponent(token)}`,
+      );
+      if (!response.ok) {
+        throw new Error('Invalid token or network error');
+      }
+      const data = await response.json();
+      renderProfileData(data, token);
+      showPanel('profile-view-panel');
+    } catch (err) {
+      console.error(err);
+      localStorage.removeItem('player_token');
+      showVerificationForm();
+      showAlert('error', 'Session expired. Please verify your info again.');
+    }
+  }
+
+  function showVerificationForm() {
+    setClearTokenButtonVisible(false);
+    currentPlayerRackets = [];
+    renderRacketInventory([]);
+    if (profileJobStatus) {
+      profileJobStatus.textContent = '';
+      profileJobStatus.className = 'profile-job-status hidden';
+    }
+    showPanel('profile-verify-panel');
+    resetVerificationFormState();
+  }
+
+  function renderProfileData(data, token) {
+    currentPlayerData = data.player;
+    currentPlayerData.token = token;
+    setClearTokenButtonVisible(true);
+    if (profileLoading) profileLoading.classList.add('hidden');
+
+    const playerRackets = data.rackets || [];
+
+    if (profileImage) {
+      profileImage.src = GENERIC_PROFILE_IMAGE;
+      profileImage.alt = 'profile';
+    }
+
+    renderRacketInventory(playerRackets);
+    renderProfileJobStatus(data.jobs);
+
+    // Populate Info Tab
+    if (profileNameInput) profileNameInput.value = data.player.name || '';
+    if (profileEmailInput) profileEmailInput.value = data.player.email || '';
+    if (profilePhoneInput) profilePhoneInput.value = data.player.phone || '';
+    if (profileStringPrefInput) profileStringPrefInput.value = data.player.string_pref || '';
+    if (profileTensionInput) profileTensionInput.value = data.player.tension || '';
+    if (profileGripInput) profileGripInput.value = data.player.grip || '';
+    if (profileRacquetInput) profileRacquetInput.value = data.player.racquet || '';
+    if (profileNotesInput) profileNotesInput.value = data.player.notes || '';
+
+    // Populate merged Jobs list (stringing + history)
+    if (profileJobsList) {
+      const mergedEntries = buildMergedJobEntries(data.jobs, data.history);
+
+      if (mergedEntries.length === 0) {
+        profileJobsList.innerHTML = '<p>No jobs recorded yet.</p>';
+      } else {
+        profileJobsList.innerHTML = mergedEntries
+          .map((entry) =>
+            entry.source === 'stringing'
+              ? renderStringingJobEntry(entry.data, playerRackets)
+              : renderHistoryJobEntry(entry.data, playerRackets),
+          )
+          .join('');
+      }
+    }
+  }
+
+  // Check URL params for token on load
+  const urlToken = urlParams.get('token');
+  if (urlToken) {
+    localStorage.setItem('player_token', urlToken);
+    const newUrl = new URL(window.location);
+    newUrl.searchParams.delete('token');
+    window.history.replaceState({}, '', newUrl.pathname);
+    if (profileOverlay) {
+      openProfileOverlay();
+      loadProfileWithToken(urlToken);
+    }
+  }
+
+  if (profileButtons.length > 0 && profileOverlay) {
+    profileButtons.forEach((profileButton) => {
+      profileButton.addEventListener('click', () => {
+        openProfileOverlay();
+        const token = localStorage.getItem('player_token');
+        if (token) {
+          loadProfileWithToken(token);
+        } else {
+          showVerificationForm();
+        }
+      });
+    });
+  }
+
+  if (profileCloseButton) {
+    profileCloseButton.addEventListener('click', () => {
+      closeAllOverlays();
+    });
+  }
+
+  if (profileOverlay) {
+    profileOverlay.addEventListener('click', (e) => {
+      if (e.target === profileOverlay) {
+        closeAllOverlays();
+      }
+    });
+  }
+
+  if (profileClearTokenBtn) {
+    profileClearTokenBtn.addEventListener('click', () => {
+      localStorage.removeItem('player_token');
+      currentPlayerData = null;
+      showVerificationForm();
+    });
+  }
+
+  if (profileRacketInventory) {
+    profileRacketInventory.addEventListener('click', (event) => {
+      const slot = event.target.closest('.profile-racket-inventory__slot');
+      if (!slot) return;
+
+      const index = Number.parseInt(slot.dataset.racketIndex, 10);
+      const racket = currentPlayerRackets[index];
+      if (!racket) return;
+
+      showRacketDetail(racket, slot);
+    });
+  }
+
+  if (profileVerifyForm) {
+    profileVerifyForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearAlerts();
+
+      const name = verifyNameInput.value.trim();
+      const phone_last4 = verifyPhoneLast4Input.value.trim();
+      const phone = verifyPhoneFullInput.value.trim();
+
+      const payload = { name };
+      if (isCollisionActive) {
+        payload.phone = phone;
+      } else {
+        payload.phone_last4 = phone_last4;
+      }
+
+      showPanel('profile-loading');
+
+      try {
+        const response = await fetch(`${API_URL}/api/player-verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || 'Verification failed. Player not found.');
+        }
+
+        const data = await response.json();
+        if (data.multiple) {
+          isCollisionActive = true;
+          showPanel('profile-verify-panel');
+          if (verifyPhoneLast4Container) verifyPhoneLast4Container.classList.add('hidden');
+          if (verifyPhoneFullContainer) verifyPhoneFullContainer.classList.remove('hidden');
+          if (verifyPhoneLast4Input) verifyPhoneLast4Input.removeAttribute('required');
+          if (verifyPhoneFullInput) verifyPhoneFullInput.setAttribute('required', 'true');
+          showAlert('error', 'Multiple matches found. Please enter your full phone number.');
+        } else if (data.token) {
+          localStorage.setItem('player_token', data.token);
+          renderProfileData(data, data.token);
+          showPanel('profile-view-panel');
+          showAlert('success', 'Verified successfully!');
+        }
+      } catch (err) {
+        console.error(err);
+        showPanel('profile-verify-panel');
+        showAlert('error', err.message || 'Player not found. Please verify details.');
+      }
+    });
+  }
+
+  // Handle Tab Switching
+  profileTabButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      profileTabButtons.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const targetTab = btn.dataset.tab;
+      profileTabContents.forEach((content) => {
+        if (content.id === `profile-tab-${targetTab}`) {
+          content.classList.remove('hidden');
+        } else {
+          content.classList.add('hidden');
+        }
+      });
+    });
+  });
+
+  // Handle Profile Form Submission
+  if (profileEditForm) {
+    profileEditForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!currentPlayerData || !currentPlayerData.token) return;
+
+      const payload = {
+        name: currentPlayerData.name,
+        email: profileEmailInput.value.trim(),
+        phone: profilePhoneInput.value.trim(),
+        string_pref: profileStringPrefInput.value.trim(),
+        tension: profileTensionInput.value.trim(),
+        grip: profileGripInput.value.trim(),
+        racquet: profileRacquetInput.value.trim(),
+        notes: profileNotesInput.value.trim(),
+      };
+
+      showPanel('profile-loading');
+      clearAlerts();
+
+      try {
+        const response = await fetch(
+          `${API_URL}/api/players/${currentPlayerData.id}?token=${encodeURIComponent(currentPlayerData.token)}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to update profile');
+        }
+
+        await loadProfileWithToken(currentPlayerData.token);
+        showAlert('success', 'Profile updated successfully!');
+      } catch (err) {
+        console.error(err);
+        showPanel('profile-view-panel');
+        showAlert('error', 'Error updating profile. Please try again.');
+      }
+    });
+  }
+
+  // Inventory Overlay
+  const inventoryButtons = document.querySelectorAll('.inventory-button, .inventory-button-mobile');
   const inventoryCloseButton = document.querySelector('.inventory-overlay__close');
   const inventoryGrid = document.getElementById('inventory-grid');
 
   if (inventoryButtons.length > 0 && inventoryOverlay) {
     inventoryButtons.forEach((inventoryButton) => {
       inventoryButton.addEventListener('click', () => {
-        inventoryOverlay.classList.remove('hidden');
+        openInventoryOverlay();
         fetchInventory();
       });
     });
   }
 
-  if (inventoryCloseButton && inventoryOverlay) {
+  if (inventoryCloseButton) {
     inventoryCloseButton.addEventListener('click', () => {
-      inventoryOverlay.classList.add('hidden');
+      closeAllOverlays();
     });
   }
 
   if (inventoryOverlay) {
     inventoryOverlay.addEventListener('click', (e) => {
       if (e.target === inventoryOverlay) {
-        inventoryOverlay.classList.add('hidden');
+        closeAllOverlays();
       }
     });
   }
@@ -143,7 +767,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Sort items: strings first, then rackets, then other equipment
-    const sortedItems = items.sort((a, b) => {
+    items.sort((a, b) => {
       const categoryOrder = { string: 0, racket: 1 };
       const aCategoryOrder = categoryOrder[a.category?.toLowerCase()] ?? 2;
       const bCategoryOrder = categoryOrder[b.category?.toLowerCase()] ?? 2;
