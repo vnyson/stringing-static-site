@@ -63,6 +63,61 @@ function generateAccessToken(): string {
   return crypto.randomUUID();
 }
 
+function normalizePhone(phone: string): string {
+  return (phone || '').replace(/\D/g, '');
+}
+
+function stripPricingFromStringing(job: any): any {
+  if (!job) return job;
+  const cleaned = { ...job };
+  delete cleaned.labour_cost;
+  delete cleaned.material_cost;
+  delete cleaned.charge_total;
+  return cleaned;
+}
+
+function stripPricingFromHistory(record: any): any {
+  if (!record) return record;
+  const cleaned = { ...record };
+  cleaned.job_type =
+    record.price_specs_matching != null && record.price_specs_matching !== 0
+      ? 'matching'
+      : 'customization';
+  delete cleaned.price_currency;
+  delete cleaned.price_overgrip;
+  delete cleaned.price_specs_measurement;
+  delete cleaned.price_specs_matching;
+  delete cleaned.price_grip_replacement;
+  delete cleaned.price_bumper_grommet;
+  delete cleaned.price_other;
+  delete cleaned.price_other_label;
+  delete cleaned.price_total;
+  return cleaned;
+}
+
+const QUEUED_JOB_STATUSES = new Set(['queued', 'in_queue']);
+
+function isJobQueued(status: string | null | undefined): boolean {
+  return QUEUED_JOB_STATUSES.has((status || '').toLowerCase());
+}
+
+function sortQueueJobs(jobs: any[]): any[] {
+  return [...jobs].sort((a, b) => {
+    if (a.priority === 'rush' && b.priority !== 'rush') return -1;
+    if (a.priority !== 'rush' && b.priority === 'rush') return 1;
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+  });
+}
+
+async function buildQueuePositionMap(env: Env): Promise<Map<string, number>> {
+  const queueResult = await env.DB.prepare(
+    "SELECT id, priority, created_at FROM stringing WHERE status IN ('queued', 'in_queue')",
+  ).all();
+
+  const sortedQueue = sortQueueJobs(queueResult.results || []);
+  return new Map(sortedQueue.map((job: any, index: number) => [job.id, index + 1]));
+}
+
 // OAuth handler - redirect to Google
 async function handleGoogleAuth(
   request: Request,
@@ -186,9 +241,150 @@ async function handlePlayerByToken(
     .bind(playerId)
     .all();
 
-  return new Response(JSON.stringify({ player, jobs: jobs.results, rackets: rackets.results }), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  // Get player's history
+  const history = await env.DB.prepare(
+    'SELECT * FROM history WHERE player_id = ? ORDER BY created_at DESC',
+  )
+    .bind(playerId)
+    .all();
+
+  const queuePositionById = await buildQueuePositionMap(env);
+
+  const cleanJobs = (jobs.results || []).map((job: any) => {
+    const cleaned = stripPricingFromStringing(job);
+    if (isJobQueued(job.status)) {
+      cleaned.queue_position = queuePositionById.get(job.id) ?? null;
+    }
+    return cleaned;
   });
+  const cleanHistory = (history.results || []).map(stripPricingFromHistory);
+
+  return new Response(
+    JSON.stringify({
+      player,
+      jobs: cleanJobs,
+      rackets: rackets.results || [],
+      history: cleanHistory,
+    }),
+    {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    },
+  );
+}
+
+// Handler for player-verify endpoint
+async function handlePlayerVerify(
+  request: Request,
+  env: Env,
+  corsHeaders: HeadersInit,
+): Promise<Response> {
+  if (request.method !== 'POST') {
+    return new Response('Method Not Allowed', { status: 405, headers: corsHeaders });
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return new Response('Invalid JSON', { status: 400, headers: corsHeaders });
+  }
+
+  const nameQuery = (body.name || '').trim().toLowerCase();
+  if (!nameQuery) {
+    return new Response(JSON.stringify({ error: 'Name is required' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  const phoneLast4 = normalizePhone(body.phone_last4 || '');
+  const fullPhone = normalizePhone(body.phone || '');
+
+  if (!phoneLast4 && !fullPhone) {
+    return new Response(JSON.stringify({ error: 'Either phone_last4 or phone is required' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Fetch all players to perform normalization and fuzzy matching in memory
+  const playersResult = await env.DB.prepare('SELECT * FROM players').all();
+  const allPlayers = playersResult.results || [];
+
+  const matches = allPlayers.filter((p: any) => {
+    // Case-insensitive substring match on name
+    const nameMatch = p.name && p.name.toLowerCase().includes(nameQuery);
+    if (!nameMatch) return false;
+
+    const playerPhoneNormalized = normalizePhone(p.phone || '');
+    if (fullPhone) {
+      return playerPhoneNormalized === fullPhone;
+    } else {
+      return playerPhoneNormalized.endsWith(phoneLast4);
+    }
+  });
+
+  if (matches.length === 0) {
+    return new Response(JSON.stringify({ error: 'Player not found' }), {
+      status: 404,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (matches.length > 1) {
+    // If we matched on last 4 digits and didn't provide full phone, request full phone
+    if (!fullPhone) {
+      return new Response(JSON.stringify({ multiple: true }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
+  // Single match or we resolved multiple with full phone
+  let player = matches[0];
+  if (!player.access_token) {
+    const newToken = generateAccessToken();
+    await env.DB.prepare('UPDATE players SET access_token = ?, updated_at = ? WHERE id = ?')
+      .bind(newToken, new Date().toISOString(), player.id)
+      .run();
+    player.access_token = newToken;
+  }
+
+  // Retrieve player's clean details
+  const jobs = await env.DB.prepare(
+    'SELECT * FROM stringing WHERE player_id = ? ORDER BY created_at DESC',
+  )
+    .bind(player.id)
+    .all();
+
+  const rackets = await env.DB.prepare(
+    'SELECT * FROM rackets WHERE player_id = ? ORDER BY created_at DESC',
+  )
+    .bind(player.id)
+    .all();
+
+  const history = await env.DB.prepare(
+    'SELECT * FROM history WHERE player_id = ? ORDER BY created_at DESC',
+  )
+    .bind(player.id)
+    .all();
+
+  const cleanJobs = (jobs.results || []).map(stripPricingFromStringing);
+  const cleanHistory = (history.results || []).map(stripPricingFromHistory);
+
+  return new Response(
+    JSON.stringify({
+      token: player.access_token,
+      player,
+      jobs: cleanJobs,
+      rackets: rackets.results || [],
+      history: cleanHistory,
+    }),
+    {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    },
+  );
 }
 
 // Handler for regenerate-token endpoint
@@ -223,7 +419,10 @@ async function handleRegenerateToken(
     .run();
 
   // Return shareable link
-  const shareableLink = `${new URL(request.url).origin}/player?token=${newToken}`;
+  const url = new URL(request.url);
+  const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+  const frontendOrigin = isLocal ? 'http://localhost:8080' : 'https://vnyson.com';
+  const shareableLink = `${frontendOrigin}/player.html?token=${newToken}`;
 
   return new Response(JSON.stringify({ shareableLink }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -325,6 +524,9 @@ export default {
     }
     if (path === '/api/player-by-token') {
       return handlePlayerByToken(request, env, corsHeaders);
+    }
+    if (path === '/api/player-verify') {
+      return handlePlayerVerify(request, env, corsHeaders);
     }
     if (path === '/api/regenerate-token') {
       return handleRegenerateToken(request, env, corsHeaders);
