@@ -455,7 +455,7 @@ async function handleRegenerateToken(
   // Return shareable link
   const url = new URL(request.url);
   const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-  const frontendOrigin = isLocal ? 'http://localhost:8080' : 'https://tennis-stringing.pages.dev';
+  const frontendOrigin = isLocal ? 'http://localhost:8080' : 'https://tennis.vnyson.com';
   const shareableLink = `${frontendOrigin}/?token=${newToken}`;
 
   return new Response(JSON.stringify({ shareableLink }), {
