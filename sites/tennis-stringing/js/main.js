@@ -167,6 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
     { left: '64%', bottom: '6%', width: '16%' },
     { left: '80%', bottom: '6%', width: '16%' },
   ];
+  const PROFILE_IMAGES = ['Jason Ford.png', 'Michal Paw.png'];
 
   const RACKET_IMAGE_MAP = {
     'babolat pure aero': 'assets/images/rackets/Babolat Pure Aero.png',
@@ -200,6 +201,46 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     return bestMatch || DEFAULT_RACKET_IMAGE;
+  }
+
+  function getProfileImageForPlayer(playerName) {
+    const name = (playerName || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '')
+      .replace(/\s+/g, ' ');
+
+    let bestMatch = null;
+    let bestScore = 0;
+
+    for (const filename of PROFILE_IMAGES) {
+      const slug = filename
+        .replace(/\.png$/i, '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .replace(/\s+/g, ' ');
+      const slugWords = slug.split(' ').filter(Boolean);
+      const nameWords = name.split(' ').filter(Boolean);
+
+      if (slugWords.length === 0 || nameWords.length === 0) continue;
+
+      // Count how many slug words appear in the player name
+      const matchedWords = slugWords.filter((w) => nameWords.includes(w)).length;
+      const score = matchedWords / slugWords.length;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = filename;
+      }
+    }
+
+    // Require at least 50% of image filename words to match
+    if (bestScore >= 0.5 && bestMatch) {
+      return `assets/images/profile/${bestMatch}`;
+    }
+
+    return GENERIC_PROFILE_IMAGE;
   }
 
   function getRacketImageForText(racquetText, playerRackets = []) {
@@ -505,7 +546,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const playerRackets = data.rackets || [];
 
     if (profileImage) {
-      profileImage.src = GENERIC_PROFILE_IMAGE;
+      profileImage.src = getProfileImageForPlayer(data.player.name);
       profileImage.alt = 'profile';
     }
 
